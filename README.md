@@ -18,6 +18,6 @@ You will need the latest release of [TegraExplorer](https://github.com/suchmemem
 
 - Place the `SetupChecker.te` script from the [latest release](https://github.com/JeffVi/NX-Setup-Checker/releases/latest) on your sd.
 - Insert your SD in your Switch and launch the TegraExplorer payload.
-- Browse your SD and launch the `FatalParse.te` script.
+- Browse your SD and launch the `SetupChecker.te` script.
 
 Credits to [suchmememanyskill](https://github.com/suchmememanyskill) for the MMC version check.
