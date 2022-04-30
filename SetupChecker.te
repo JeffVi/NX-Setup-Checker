@@ -1,0 +1,635 @@
+#REQUIRE SD
+
+version = "1.0"
+
+Title = {
+    color(0xF708A7)
+    println("\nCFW Setup Checker", version, "\n\n")
+    color(0xFFFFFF)
+}
+
+ReadAMSVer = {
+    color(0x0080FF)
+    filepath = "sd:/atmosphere/package3"
+    if (fsexists(filepath)) {
+        filetoparse = readfile(filepath)
+        needle = ["BYTE[]", 0x46, 0x53, 0x53, 0x30]
+        addr = filetoparse.find(needle)
+        if (addr > 0) {
+            verbytes = filetoparse.slice(addr + 0x15, 7).project()
+            hospat = verbytes[0]
+            hosmin = verbytes[1]
+            hosmaj = verbytes[2]
+            amspat = verbytes[4]
+            amsmin = verbytes[5]
+            amsmaj = verbytes[6]
+            println("AMS version: " + amsmaj.str() + "." + amsmin.str() + "." + amspat.str())
+            println("HOS sopported: " + hosmaj.str() + "." + hosmin.str() + "." + hospat.str())
+        }
+        .else() {
+            hospat = 0
+            hosmin = 0
+            hosmaj = 0
+            color(0xFF0000)
+            println("Unable to find AMS version!")
+        }
+    }
+    .else() {
+        hospat = 0
+        hosmin = 0
+        hosmaj = 0
+        color(0xFF0000)
+        println("Unable to find sd:/atmosphere/package3")
+    }
+    color(0xFFFFFF)
+    filetoparse = 0
+}
+
+# Needs to be improved
+ReadHekateVer = {
+    color(0x00FF7B)
+    filepath = "sd:/bootloader/update.bin"
+    if (fsexists(filepath)) {
+        filetoparse = readfile(filepath)
+        needle = ["BYTE[]", 0x6C, 0x69, 0x62, 0x73, 0x79, 0x73, 0x5F, 0x6C, 0x70, 0x30]
+        addr = filetoparse.find(needle)
+        if (addr > 0) {
+            filetoparse = filetoparse.slice(addr, 0x100).project()
+            needle = ["BYTE[]", 0x76, 0x35, 0x2E]
+            addr = filetoparse.find(needle)
+            print("Hekate's version: ")
+            if (addr > 0) {
+                verbytes = filetoparse.slice(addr + 0x1, 5).project()
+                println(verbytes.bytestostr())
+            }
+            .else() {
+                color(0xFFC800)
+                println(" Unfound!")
+            }
+        }
+        .else() {
+            color(0xFF0000)
+            println("Unable to find Hekate's version!")
+        }
+    }
+    .else() {
+        color(0xFF0000)
+        println("Unable to find sd:/bootloader/update.bin\n Are you using Hekate?")
+    }
+    color(0xFFFFFF)
+    save120 = 0
+    filetoparse = 0
+}
+
+readfw = {
+    save120 = readsave("bis:/save/8000000000000120")
+    filetoparse = save120.read("/meta/imkvdb.arc")
+    needle = ["BYTE[]", 0x9, 0x8, 0x0, 0x0, 0x0, 0x0, 0x0, 0x1]
+    addr = filetoparse.find(needle)
+    if (addr > 0) {
+        verbytes = filetoparse.slice(addr + 8, 4).project()
+        ver = (verbytes[3] << 24) | (verbytes[2] << 16) | (verbytes[1] << 8) | (verbytes[0])
+		pat = ((ver >> 16) & ((1 << 4) - 1))
+		min = ((ver >> 20) & ((1 << 6) - 1))
+		maj = ((ver >> 26) & ((1 << 6) - 1))
+        print(maj.str() + "." + min.str() + "." + pat.str())
+        if ((hosmaj < maj) || ((hosmaj >= maj) && (hosmin < min))) {
+            color(0xFF0000)
+            print("    Atmosphere needs to be updated!")
+            color(0xFF5252)
+        }
+        .else() {
+            if (hospat < pat) {
+                color(0xFFC800)
+                print("    Atmosphere may need to be updated!")
+                color(0xFF5252)
+            }
+        }
+        println()
+    }
+    .else() {
+        color(0xFF0000)
+        println("Unable to find FW version!")
+    }
+    save120 = 0
+    filetoparse = 0
+}
+
+PrintFWs = {
+    color(0xFF5252)
+    print("Sysmmc firmware: ")
+    if (mountsys("SYSTEM")) {
+        color(0xFF0000)
+        println("SYSTEM mount failed!")
+        color(0xFF5252)
+    }
+    .else() {
+        readfw()
+    }
+
+    if (emu()) {
+        print("Emummc firmware: ")
+        if (mountemu("SYSTEM")) {
+            color(0xFF0000)
+            println("SYSTEM mount failed!")
+            color(0xFF5252)
+        }
+        .else() {
+            readfw()
+        }
+    }
+    color(0xFFFFFF)
+}
+
+CheckReports = {
+
+    filepath = "sd:/atmosphere/fatal_errors"
+    if (fsexists(filepath)) {
+        dirtoparse = readdir("sd:/atmosphere/fatal_errors")
+        if (dirtoparse.result){
+        color(0xFF0000)
+        println("Failed to open sd:/atmosphere/fatal_errors")
+        }
+        .else() {
+            latestreport = "0000000000000000.bin".bytes()
+            dirtoparse.files.foreach("report") {
+                name = report.split("_")
+                if (name[0] == "report"){
+                    currentreport = name[1].bytes()
+                    if (currentreport.len() == 12) {
+                        it = 0
+                        while ((latestreport[it + 8] == currentreport[it]) && (it < 12)) {
+                            it = it + 1
+                        }
+                        if (latestreport[it + 8] < currentreport[it]) {
+                            latestreport = ("00000000" + currentreport.bytestostr()).bytes()
+                            filepath = combinepath("sd:/atmosphere/fatal_errors", "report_" + currentreport.bytestostr())
+                        }
+                    }
+                    if (currentreport.len() == 20) {
+                        it = 0
+                        while ((latestreport[it] == currentreport[it]) && (it < 20)) {
+                            it = it + 1
+                        }
+                        if (latestreport[it] < currentreport[it]) {
+                            latestreport = currentreport
+                            filepath = combinepath("sd:/atmosphere/fatal_errors", "report_" + currentreport.bytestostr())
+                        }
+                    }
+                }
+            }
+            if (latestreport == "0000000000000000.bin".bytes()) {
+                println("No fatal report found!")
+            }
+            .else() {
+                println("Parsing latest report...\n")
+                ParseReport()
+            }
+        }
+    }
+    .else() {
+        println("No fatal to parse!")
+    }
+    latestreport = 0
+    currentreport = 0
+    color(0xFFFFFF)
+}
+
+ParseReport = {
+    color(0xFFA600)
+    println("Report file: ", filepath, "\n")
+    filetoparse = readfile(filepath)
+    needle = ["BYTE[]", 0x41, 0x46, 0x45, 0x32]
+    if ((filetoparse.slice(0x0, 0x4).project() == needle).not()){
+        color(0xFF0000)
+        println("ERROR!", filepath, "is not valid! AFE2 missing!")
+    }
+    .else() {
+        TID = filetoparse.slice(0x8, 8)
+        errcode = filetoparse.slice(0x10, 3)
+        hex2print = errcode.project()
+        print("Error: 0x")
+        GetHex()
+        print(hexstr)
+        CheckErr()
+        println()
+        hex2print = TID.project()
+        print("Title ID: ")
+        GetHex()
+        print(hexstr)
+        CheckTID()
+    }
+    color(0xFFFFFF)
+    filetoparse = 0
+}
+
+CheckErr = {
+
+    err_int = (hex2print[2] * 65536) + (hex2print[1] * 256) + hex2print[0]
+    err_module = err_int & 0x1FF
+    err_description = (err_int >> 9) & 0x3FFF
+    print("    Code: ")
+    print(2000 + err_module)
+    print("-")
+    if (err_description < 1000){print(0)}
+    if (err_description < 100){print(0)}
+    if (err_description < 10){print(0)}
+    print(err_description)
+
+    it = 0
+    modules.IDs.foreach("ID") {
+        if (err_module == ID) {
+            println("    Module:", modules.names[it])
+            it = 0
+            break()
+        }
+        it = it + 1
+    }
+}
+
+CheckTID = {
+    
+    it = 0
+    sysmodules.IDs.foreach("ID") {
+        if (hexstr == ID) {
+            println("    Sysmodule name:", sysmodules.names[it])
+            it = 0
+            break()
+        }
+        it = it + 1
+    }
+
+    if (!it) {
+        custom_sysmodules.IDs.foreach("ID"){
+            if (hexstr == ID){
+                println("    Custom sysmodule name:", custom_sysmodules.names[it])
+                it = 0
+                break()
+            }
+            it = it + 1
+        }
+    }
+
+    if (!it){
+        titles.IDs.foreach("ID"){
+            if (hexstr == ID){
+                println("Title name:", titles.names[it])
+                it = 0
+                break()
+            }
+            it = it + 1
+        }
+    }
+}
+
+GetHex = {
+
+    hexstr = ""
+    hexlen = hex2print.len()
+    while (hexlen > 0){
+        hexlen = hexlen - 1
+
+        hex_d = hex2print[hexlen] % 16
+        hex_u = (hex2print[hexlen] - hex_d) / 16
+
+        if (hex_u < 10){str_u = hex_u.str()}
+        if (hex_u == 10){str_u = "A"}
+        if (hex_u == 11){str_u = "B"}
+        if (hex_u == 12){str_u = "C"}
+        if (hex_u == 13){str_u = "D"}
+        if (hex_u == 14){str_u = "E"}
+        if (hex_u == 15){str_u = "F"}
+
+        if (hex_d < 10){str_d = hex_d.str()}
+        if (hex_d == 10){str_d = "A"}
+        if (hex_d == 11){str_d = "B"}
+        if (hex_d == 12){str_d = "C"}
+        if (hex_d == 13){str_d = "D"}
+        if (hex_d == 14){str_d = "E"}
+        if (hex_d == 15){str_d = "F"}
+
+        hexstr = hexstr + str_u + str_d
+    }
+}
+
+sysmodules = dict()
+
+sysmodules.IDs = [
+    "0100000000000000",
+    "0100000000000001",
+    "0100000000000002",
+    "0100000000000003",
+    "0100000000000004",
+    "0100000000000005",
+    "0100000000000006",
+    "0100000000000007",
+    "0100000000000008",
+    "0100000000000009",
+    "010000000000000A",
+    "010000000000000B",
+    "010000000000000C",
+    "010000000000000D",
+    "010000000000000E",
+    "010000000000000F",
+    "0100000000000010",
+    "0100000000000011",
+    "0100000000000012",
+    "0100000000000013",
+    "0100000000000014",
+    "0100000000000015",
+    "0100000000000016",
+    "0100000000000017",
+    "0100000000000018",
+    "0100000000000019",
+    "010000000000001A",
+    "010000000000001B",
+    "010000000000001C",
+    "010000000000001D",
+    "010000000000001E",
+    "010000000000001F",
+    "0100000000000020",
+    "0100000000000021",
+    "0100000000000022",
+    "0100000000000023",
+    "0100000000000024",
+    "0100000000000025",
+    "0100000000000026",
+    "0100000000000027",
+    "0100000000000028",
+    "0100000000000029",
+    "010000000000002A",
+    "010000000000002B",
+    "010000000000002C",
+    "010000000000002D",
+    "010000000000002E",
+    "010000000000002F",
+    "0100000000000030",
+    "0100000000000031",
+    "0100000000000032",
+    "0100000000000033",
+    "0100000000000034",
+    "0100000000000035",
+    "0100000000000036",
+    "0100000000000037",
+    "0100000000000038",
+    "0100000000000039",
+    "010000000000003A",
+    "010000000000003B",
+    "010000000000003C",
+    "010000000000003D",
+    "010000000000003E",
+    "010000000000003F",
+    "0100000000000040",
+    "0100000000000041",
+    "0100000000000042"
+]
+
+sysmodules.names = [
+    "fs",
+    "ldr",
+    "ncm",
+    "pm",
+    "sm",
+    "boot",
+    "usb",
+    "tma.stub/htc.stub",
+    "boot2",
+    "settings",
+    "Bus",
+    "bluetooth",
+    "bcat",
+    "dmnt",
+    "friends",
+    "nifm",
+    "ptm",
+    "shell",
+    "bsdsockets",
+    "hid",
+    "audio",
+    "LogManager",
+    "wlan",
+    "cs",
+    "ldn",
+    "nvservices",
+    "pcv",
+    "ppc/capmtp",
+    "nvnflinger",
+    "pcie/pcie.withoutHb",
+    "account",
+    "ns",
+    "nfc",
+    "psc",
+    "capsrv",
+    "am",
+    "ssl",
+    "nim",
+    "cec",
+    "tspm",
+    "spl",
+    "lbl",
+    "btm",
+    "erpt",
+    "time",
+    "vi",
+    "pctl",
+    "npns",
+    "eupld",
+    "arp/glue",
+    "eclct",
+    "es",
+    "fatal",
+    "grc",
+    "creport",
+    "ro",
+    "profiler",
+    "sdb",
+    "migration",
+    "jit",
+    "jpegdec",
+    "safemode",
+    "olsc",
+    "dt",
+    "nd",
+    "ngct",
+    "pgl"
+]
+
+custom_sysmodules = dict()
+
+custom_sysmodules.IDs = [
+    "0000000000534C56",
+    "00FF0000000002AA",
+    "00FF0000636C6BFF",
+    "00FF00006D7470FF",
+    "00FF0000A53BB665",
+    "00FF747765616BFF",
+    "0100000000000052",
+    "0100000000000081",
+    "0100000000000352",
+    "0100000000000464",
+    "0100000000000523",
+    "0100000000000901",
+    "0100000000000BEF",
+    "0100000000000dad",
+    "0100000000000f12",
+    "0100000000000faf",
+    "0100000000006480",
+    "0100000000007200",
+    "010000000000bd00",
+    "010000000000C235",
+    "010000000000f00f",
+    "010000000000FFAB",
+    "01000000001ED1ED",
+    "0532232232232000",
+    "054E4F4558454000",
+    "2200000000000100",
+    "4100000000000324",
+    "4200000000000000",
+    "420000000000000E",
+    "420000000000000F",
+    "4200000000000010",
+    "4200000000000811",
+    "4200000000000BAC",
+    "4200000000000FFF",
+    "420000000007E51A",
+    "4200000000474442",
+    "4200000000696969",
+    "4200000AF1E8DA89",
+    "42000062616B6101",
+    "4200736372697074",
+    "4206900000000012",
+    "430000000000000A",
+    "430000000000000B",
+    "430000000000000C",
+    "43000000000000FF",
+    "4300000000000909",
+    "5600000000000000",
+    "690000000000000D"
+]
+
+custom_sysmodules.names = [
+    "SaltyNX",
+    "BootSoundNX",
+    "sys-clk",
+    "mtp-server-nx",
+    "SysDVR",
+    "switch-sys-tweak",
+    "switch-nfp-mitm",
+    "nx-btred",
+    "emuiibo",
+    "SwitchPresence",
+    "aoc-mitm",
+    "OJDS-NX",
+    "fsp-usb",
+    "nx_overlay",
+    "Fizeau",
+    "hid-mitm/hid-mitm-plus",
+    "twili",
+    "ilia",
+    "MissionControl",
+    "Freebird",
+    "dvdnx",
+    "usb-mitm",
+    "maydel",
+    "NX-input-recorder",
+    "noexs",
+    "SplitNX",
+    "sys-http",
+    "sys-tune/sys-audioplayer",
+    "sys-ftpd/sys-ftpd-light",
+    "SlideNX",
+    "ldn_mitm",
+    "bitmap-printer",
+    "SwiTAS",
+    "sys-triplayer",
+    "nx-ovlloader",
+    "sys-gdbstub",
+    "sys-logger",
+    "ControllerSaver",
+    "sys-screenuploader",
+    "sys-script",
+    "sfdnsres_mitm",
+    "sys-netcheat",
+    "sys-botbase",
+    "sys-botbaseplus",
+    "nxsh",
+    "NXGallery",
+    "NXCord",
+    "sys-con"
+]
+
+titles = dict()
+
+titles.IDs = [
+    "0100000000001000",
+    "0100000000001001",
+    "0100000000001002",
+    "0100000000001003",
+    "0100000000001004",
+    "0100000000001005",
+    "0100000000001006",
+    "0100000000001007",
+    "0100000000001008",
+    "0100000000001009",
+    "010000000000100A",
+    "010000000000100B",
+    "010000000000100C",
+    "010000000000100D",
+    "010000000000100F",
+    "0100000000001010",
+    "0100000000001011",
+    "0100000000001012",
+    "0100000000001013",
+    "0100000000001015"
+]
+
+titles.names = [
+    "qlaunch",
+    "auth",
+    "cabinet",
+    "controller",
+    "dataErase",
+    "error",
+    "netConnect",
+    "playerSelect",
+    "swkbd",
+    "miiEdit",
+    "web",
+    "shop",
+    "overlayDisp",
+    "photoViewer",
+    "offlineWeb",
+    "loginShare",
+    "wifiWebAuth",
+    "starter",
+    "myPage",
+    "MaintenanceMenu"
+]
+
+modules = dict()
+
+modules.IDs = [
+    1,2,3,4,5,6,7,8,9,10,11,12,15,16,17,18,19,20,21,22,23,24,25,26,27,29,30,31,32,33,35,100,101,102,103,105,107,108,110,111,112,113,114,115,116,117,118,120,121,122,123,124,125,126,127,128,129,130,131,132,133,134,135,136,137,138,139,140,141,142,143,144,145,146,147,148,149,150,151,152,153,154,155,156,157,158,159,160,161,162,163,164,165,166,167,168,169,170,173,175,176,177,178,179,180,181,182,183,187,189,191,192,193,197,198,202,203,204,205,206,208,209,210,211,212,213,214,215,216,217,218,219,223,227,228,229,230,231,232,235,238,244,499
+]
+
+modules.names = [
+    "Svc","Fs","Os","Htcs","Ncm","Dd","Osdbg","Lr","Ldr","Sf","Sf_Hipc","Tma","Pm","Ns","Bsdsockets","Htc","Tsc","Kvdb","Sm","Ro","Gc","Sdmmc","Ovln","Spl","Socket","Htclow","Ddsf","Htcfs","Async","Util","Tipc","Eth","I2c","Gpio","Uart","Settings","Wlan","Xcd","Nifm","Codec","Lsm6ds3","Bluetooth","Vi","Nfp","Time","Fgm","Oe","Pcie","Friends","Bcat","Ssl","Account","News","Mii","Nfc","Am","Prepo","Ahid","Applet","Ae","Pcv","Usb_Pd","Bpc","Psm","Nim","Psc","Tc","Usb","Nsd","Pctl","Btm","La","Es","Ngc","Erpt","Apm","Cec","Profiler","Eupld","Lidbe","Audio","Npns","Http","Idle","Arp","Updater","Swkbd","Netdiag","Nfc_Mifare","Err","Fatal","Ec","Spsm","Aoc","Bgtc","Creport","Sasbus","Pl","Lbl","Jit","Hdcp","Omm","Pdm","Olsc","Srepo","Dauth","Stdfu","Dbg","Spi","Pwm","Rtc","Regulator","Led","Clkrst","Powctl","Hid","Ldn","Cs","Irsensor","Capsrv","Manu","Atk","Web","Lcs","Grc","Repair","Album","Rid","Migration","Migration_Idc","Hidbus","Ens","Websocket","Capmtp","Pgl","Notification","Ins","Lp2p","Rcd","Prc","Ectx","Dp2hdmi","Tspm"
+]
+
+
+clear()
+Title()
+
+println("Checking for version numbers...\n")
+
+ReadAMSVer()
+ReadHekateVer()
+PrintFWs()
+
+println("\nChecking for AMS fatal reports...")
+CheckReports()
+
+println("\n\nCheck finished! Press any key to exit...")
+
+pause()
+exit()
