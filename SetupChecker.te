@@ -24,7 +24,7 @@ ReadAMSVer = {
             amsmin = verbytes[5]
             amsmaj = verbytes[6]
             println("AMS version: " + amsmaj.str() + "." + amsmin.str() + "." + amspat.str())
-            println("HOS sopported: " + hosmaj.str() + "." + hosmin.str() + "." + hospat.str())
+            println("HOS supported: " + hosmaj.str() + "." + hosmin.str() + "." + hospat.str())
         }
         .else() {
             hospat = 0
