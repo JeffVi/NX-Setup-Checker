@@ -1,6 +1,6 @@
 #REQUIRE SD
 
-version = "1.0"
+version = "1.1"
 
 Title = {
     color(0xF708A7)
@@ -93,13 +93,13 @@ readfw = {
 		min = ((ver >> 20) & ((1 << 6) - 1))
 		maj = ((ver >> 26) & ((1 << 6) - 1))
         print(maj.str() + "." + min.str() + "." + pat.str())
-        if ((hosmaj < maj) || ((hosmaj >= maj) && (hosmin < min))) {
+        if ((hosmaj < maj) || ((hosmaj == maj) && (hosmin < min))) {
             color(0xFF0000)
             print("    Atmosphere needs to be updated!")
             color(0xFF5252)
         }
         .else() {
-            if (hospat < pat) {
+            if ((hosmaj == maj) && (hosmin == min) && (hospat < pat)) {
                 color(0xFFC800)
                 print("    Atmosphere may need to be updated!")
                 color(0xFF5252)
