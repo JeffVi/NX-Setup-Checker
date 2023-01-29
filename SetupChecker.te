@@ -1,6 +1,6 @@
 #REQUIRE SD
 
-version = "1.1"
+version = "1.2"
 
 Title = {
     color(0xF708A7)
@@ -45,7 +45,7 @@ ReadAMSVer = {
     filetoparse = 0
 }
 
-# Needs to be improved
+# Needs to be improved...
 ReadHekateVer = {
     color(0x00FF7B)
     filepath = "sd:/bootloader/update.bin"
@@ -53,12 +53,24 @@ ReadHekateVer = {
         filetoparse = readfile(filepath)
         needle = ["BYTE[]", 0x6C, 0x69, 0x62, 0x73, 0x79, 0x73, 0x5F, 0x6C, 0x70, 0x30]
         addr = filetoparse.find(needle)
-        if (addr > 0) {
+        if (addr >= 0) {
             filetoparse = filetoparse.slice(addr, 0x100).project()
-            needle = ["BYTE[]", 0x76, 0x35, 0x2E]
-            addr = filetoparse.find(needle)
             print("Hekate's version: ")
-            if (addr > 0) {
+            addr = -1
+            if (addr < 0)
+            {
+                # 5.0.0+
+                needle = ["BYTE[]", 0x76, 0x35, 0x2E]
+                addr = filetoparse.find(needle)
+            }
+            if (addr < 0)
+            {
+                # 6.0.0+
+                needle = ["BYTE[]", 0x76, 0x36, 0x2E]
+                addr = filetoparse.find(needle)
+            }
+            if (addr >= 0)
+            {
                 verbytes = filetoparse.slice(addr + 0x1, 5).project()
                 println(verbytes.bytestostr())
             }
